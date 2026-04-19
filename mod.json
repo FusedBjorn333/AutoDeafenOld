@@ -5,6 +5,7 @@
     "mac": "2.2081"
   },
   "name": "AutoDeafen",
+  "developer": "Lynxdeer",
   "version": "1.2.3",
   "id": "lynxdeer.autodeafen",
   "description": "A mod that automatically hits a configurable deafen keybind at a certain percentage. Configurable per-level.",
