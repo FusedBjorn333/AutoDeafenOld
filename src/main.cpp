@@ -214,7 +214,7 @@ class $modify(PauseLayer) {
             sprite,
             this,
             [](CCObject*) {
-                log::info("AutoDeafen menu opened (stub)");
+                ConfigLayer::openMenu(nullptr);
             }
         );
 
@@ -224,6 +224,6 @@ class $modify(PauseLayer) {
     }
 
     void keyDown(cocos2d::enumKeyCodes key) {
-        if (!inMenu) PauseLayer::keyDown(key);
+        if (!inMenu) PauseLayer::keyDown(key, 0.0);;
     }
 };
