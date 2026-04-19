@@ -9,7 +9,7 @@
   "id": "lynxdeer.autodeafen",
   "description": "A mod that automatically hits a configurable deafen keybind when you reach a certain percentage. Configurable per-level.",
   "tags": ["enhancement", "utility"],
-  "repository": "https://github.com/Lynxdeer/AutoDeafen",
+  "repository": "https://github.com/FusedBjorn333/AutoDeafenOld",
   "early-load": true,
   "settings": {
 	"Enabled by Default": {
