@@ -1,19 +1,9 @@
-#ifdef GEODE_IS_MACOS
-#include <ApplicationServices/ApplicationServices.h>
-#endif
-
-
-#include <iostream>
-#include <fstream>
-#include <cstring>
-#include <vector>
-
-#include <stdio.h>
-#include <locale>
-#include <codecvt>
 #ifdef GEODE_IS_WINDOWS
     #include <windows.h>
     #include <WinUser.h>
+#elif defined(GEODE_IS_MACOS)
+    #include <ApplicationServices/ApplicationServices.h>
+#endif
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -21,13 +11,13 @@
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/LoadingLayer.hpp>
 #include <Geode/modify/GManager.hpp>
-#include <Geode/cocos/cocoa/CCObject.h>
-#include <Geode/binding/CCMenuItemToggler.hpp>
-#include <Geode/ui/GeodeUI.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
+#include <Geode/ui/TextInput.hpp>
 
 #include <cocos2d.h>
-#include <Geode/ui/TextInput.hpp>
+#include <iostream>
+#include <fstream>
+#include <vector>
 
 bool isKeyDown(uint32_t key) {
 #ifdef GEODE_IS_WINDOWS
@@ -90,7 +80,7 @@ void saveFile() {
 
 	std::ofstream file(path);
 	if (file.is_open()) {
-		file.write("ad1", sizeof("ad1")); // File Header - autodeafen file version 1
+		file.write("ad1", 3); // File Header - autodeafen file version 1
 
 		int size = deafenKeybind.size();
 
@@ -132,6 +122,8 @@ void saveFile() {
 }
 
 void loadFile() {
+	deafenKeybind.clear();
+	loadedAutoDeafenLevels.clear();
 	auto path = Mod::get() -> getSaveDir();
 	path /= ".autodeafen";
 
@@ -141,9 +133,9 @@ void loadFile() {
 	if (file.is_open()) {
 
 		char header[4]; // Why on earth is the length of "ad1" 4??? wtf c++
-		file.read(header, sizeof("ad1"));
+		file.read(header, 3);
 
-		if (strncmp(header, "ad1", 4) == 0) {
+		if (strncmp(header, "ad1", 3) == 0) {
 			log::info("Loading autodeafen file version 1.");
 			for (int i = 0; i < 4; i++) {
 				uint32_t r;
@@ -158,6 +150,7 @@ void loadFile() {
 				file.read(reinterpret_cast<char*>(&level.id), sizeof(int));
 				file.read(reinterpret_cast<char*>(&level.percentage), sizeof(short));
 				loadedAutoDeafenLevels.push_back(level);
+				if (!file) break;
 				// log::debug("{} {} {} {}", level.id, level.levelType, level.enabled, level.percentage);
 			}
 		}
@@ -206,15 +199,36 @@ void saveLevel(AutoDeafenLevel lvl) {
 
 void sendKeyEvent(uint32_t key, int state) {
 #ifdef GEODE_IS_WINDOWS
-    INPUT inputs[1];
+    INPUT inputs[1]{};
     inputs[0].type = INPUT_KEYBOARD;
-    inputs[0].ki.dwFlags = state;
-    inputs[0].ki.wScan = 0;
     inputs[0].ki.wVk = key;
+    inputs[0].ki.dwFlags = state;
     SendInput(1, inputs, sizeof(INPUT));
 
 #elif defined(GEODE_IS_MACOS)
-    CGEventRef event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, state == 0);
+
+    auto mapKey = [](uint32_t k) -> CGKeyCode {
+        switch (k) {
+            case 0x48: return 4;
+            case 0x41: return 0;
+            case 0x44: return 2;
+            case 0x57: return 13;
+            case 0x53: return 1;
+
+            case 160: return 56;
+            case 161: return 60;
+            case 162: return 59;
+            case 163: return 62;
+            case 164: return 58;
+            case 165: return 61;
+        }
+        return (CGKeyCode)k;
+    };
+
+    CGKeyCode macKey = mapKey(key);
+    bool down = (state == 0);
+
+    CGEventRef event = CGEventCreateKeyboardEvent(NULL, macKey, down);
     CGEventPost(kCGHIDEventTap, event);
     CFRelease(event);
 #endif
@@ -343,17 +357,21 @@ class $modify(PlayLayer) {
 	}
 };
 
-// Shamelessly copied from https://gist.github.com/radj307/201e82048751713eb522386b46d94955
+#ifdef GEODE_IS_WINDOWS
 std::wstring KeyNameFromScanCode(const unsigned scanCode) {
-	wchar_t buf[32]{};
-	GetKeyNameTextW(scanCode << 16, buf, sizeof(buf));
-	return{ buf };
+    wchar_t buf[32]{};
+    GetKeyNameTextW(scanCode << 16, buf, sizeof(buf));
+    return { buf };
 }
 
 std::wstring KeyNameFromVirtualKeyCode(const unsigned virtualKeyCode){
-	return KeyNameFromScanCode(MapVirtualKeyW(virtualKeyCode, MAPVK_VK_TO_VSC));
+    return KeyNameFromScanCode(MapVirtualKeyW(virtualKeyCode, MAPVK_VK_TO_VSC));
 }
-
+#else
+std::wstring KeyNameFromVirtualKeyCode(const unsigned) {
+    return L"Key";
+}
+#endif
 bool currentlyInMenu = false;
 
 class EditKeybindLayer : public geode::Popup<std::string const&> {
@@ -387,7 +405,10 @@ class EditKeybindLayer : public geode::Popup<std::string const&> {
 				keycodes = keycodes + std::to_string(key) + ", ";
 			}
 			str.pop_back();str.pop_back();str.pop_back();
-			keycodes.pop_back();keycodes.pop_back();
+			if (keycodes.size() >= 2) {
+    			keycodes.pop_back();
+    			keycodes.pop_back();
+			}
 
 			// log::debug("{}{}{}{}", "Keys: ", str, " ||  Keycodes: ", keycodes );
 
