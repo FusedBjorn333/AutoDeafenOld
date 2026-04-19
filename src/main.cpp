@@ -1,3 +1,8 @@
+#ifdef GEODE_IS_MACOS
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
+
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -6,8 +11,9 @@
 #include <stdio.h>
 #include <locale>
 #include <codecvt>
-#include <windows.h>
-#include <WinUser.h>
+#ifdef GEODE_IS_WINDOWS
+    #include <windows.h>
+    #include <WinUser.h>
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -22,6 +28,17 @@
 
 #include <cocos2d.h>
 #include <Geode/ui/TextInput.hpp>
+
+bool isKeyDown(uint32_t key) {
+#ifdef GEODE_IS_WINDOWS
+    return GetKeyState(key) < 0;
+#elif defined(GEODE_IS_MACOS)
+    return CGEventSourceKeyState(
+        kCGEventSourceStateHIDSystemState,
+        (CGKeyCode)key
+    );
+#endif
+}
 
 using namespace geode::prelude;
 
@@ -188,16 +205,20 @@ void saveLevel(AutoDeafenLevel lvl) {
 }
 
 void sendKeyEvent(uint32_t key, int state) {
-	INPUT inputs[1];
-	inputs[0].type = INPUT_KEYBOARD;
-	if (key == 163 || key == 165) inputs[0].ki.dwFlags = state | KEYEVENTF_EXTENDEDKEY; 
-	else inputs[0].ki.dwFlags = state;
-	inputs[0].ki.wScan = 0;
-	inputs[0].ki.wVk = key;
+#ifdef GEODE_IS_WINDOWS
+    INPUT inputs[1];
+    inputs[0].type = INPUT_KEYBOARD;
+    inputs[0].ki.dwFlags = state;
+    inputs[0].ki.wScan = 0;
+    inputs[0].ki.wVk = key;
+    SendInput(1, inputs, sizeof(INPUT));
 
-	SendInput(1, inputs, sizeof(INPUT));
+#elif defined(GEODE_IS_MACOS)
+    CGEventRef event = CGEventCreateKeyboardEvent(NULL, (CGKeyCode)key, state == 0);
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+#endif
 }
-
 void triggerDeafenKeybind() {
 
 	if (deafenKeybind.size() == 0) {
@@ -352,7 +373,7 @@ class EditKeybindLayer : public geode::Popup<std::string const&> {
 			std::vector<uint32_t> keys = {}; // Max 4 keys
 
 			for (uint32_t i = 0; i < 6; i++)
-				if (GetKeyState(160 + i) < 0 && keys.size() < 3) {
+				if (isKeyDown(160 + i) && keys.size() < 3) {
 					keys.push_back(160 + i);
 					log::debug("Mod key {} is pressed", 160 + i);
 				}
